@@ -5,7 +5,6 @@ const UserSchema = new Schema({
     email: { type: String, required: true },
     firstName: { type: String, required: true },
     lastName: { type: String, required: true },
-    gold: { type: Boolean, default: false },
     dni: { type: Number, required: true },
     birthdate: { type: Date, required: true },
     gender: { type: String, required: true, enum: ['male', 'female', 'other'] },
@@ -14,7 +13,12 @@ const UserSchema = new Schema({
     is_deleted: { type: Boolean, default: false },
     image: { type: Schema.ObjectId, ref: 'Image', default: null },
     verified_email: { type: Boolean, default: false },
-    verificationToken: { type: String, default: null }
+    verificationToken: { type: String, default: null },
+    verified_professional: { type: Boolean, default: false },
+    favorites: [{ type: Schema.ObjectId, ref: 'User', default: null }],
+    rating: { type: Number, required: false, default: 0 },
+    gold: { type: Boolean, default: false },
+    userType: { type: String, required: true, enum: ['client', 'professional']}
 });
 
 UserSchema.methods.generateHash = (password) => {

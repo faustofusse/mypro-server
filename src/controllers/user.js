@@ -7,10 +7,6 @@ const { sendRegisterEmail } = require("../utils/mail");
 require('dotenv').config();
 
 const validationConstraints = {
-  username: { 
-    presence: {allowEmpty: false}, type: "string", length: { minimum: 5 }, 
-    format: { pattern: "[a-z0-9]+", flags: "i", message: "can only contain a-z and 0-9" } 
-  },
   firstName: { presence: {allowEmpty: false}, type: "string" },
   lastName: { presence: {allowEmpty: false}, type: "string" },
   email:{ presence: {allowEmpty: false}, type: "string", email: true },
@@ -19,23 +15,24 @@ const validationConstraints = {
 };
 
 exports.register = async (req, res) => {
-  let { username, email, password, firstName, lastName } = req.body;
+  let { email, password, firstName, lastName, dni, gender, birthdate, userType } = req.body;
   email = email ? email.toLowerCase() : null;
   let errors = validate(req.body, validationConstraints);
   if (!errors) errors = {};
   let users = await User.find({ email, is_deleted: false });
   if (users.length > 0) errors.email = [].concat(['Email is already registered.'], errors.email ? errors.email : []);
-  users = await User.find({ username, is_deleted: false });
-  if (users.length > 0) errors.username = [].concat(['Username is already registered.'], errors.username ? errors.username : []);
+  users = await User.find({ dni, is_deleted: false });
+  if (users.length > 0) errors.username = [].concat(['DNI is already registered.'], errors.dni ? errors.dni : []);
   if (Object.keys(errors).length > 0) return res.send({success:false, message: 'Invalid fields', errors: errors});
-  const newUser = new User({email, username, firstName, lastName});
+  const newUser = new User({ email, firstName, lastName, dni, gender, birthdate, userType });
   newUser.password = newUser.generateHash(password);
-  if (process.env.EMAIL_VERIFICATION) {
+  if (process.env.EMAIL_VERIFICATION === 'true') {
     const verificationToken = jwt.sign({ user: newUser._id, firstName, expires_at: Date.now() + 24 * 3600 * 1000 }, process.env.JWT_SECRET);
     await sendRegisterEmail(newUser, verificationToken);
     newUser.verificationToken = verificationToken;
   } else { newUser.verified_email = true; }
   newUser.save((err, user) => {
+    if (err) console.error(err);
     if (err) return res.send({success: false, message: 'Server error, user not created.'})
     res.send({success: true, message: 'User registered.'})
   });
@@ -58,8 +55,8 @@ exports.login = async (req, res) => {
     userSession.save((err, doc) => {
         if (err) return res.send({success: false, message: 'Server error.'});
         const token = jwt.sign({userId: user._id, sessionId: doc._id}, process.env.JWT_SECRET);
-        const { email, username, firstName, lastName, image} = user;
-        user = { email, username, firstName, lastName, image };
+        const { email, firstName, lastName, dni, birthdate, gender, userType, gold, rating, favorites, image } = user;
+        user = { email, firstName, lastName, dni, birthdate, gender, userType, gold, rating, favorites, image };
         return res.send({success: user, message: 'Valid login.', token: token, user: user });
     });
   });
@@ -149,8 +146,8 @@ exports.getUser = async (req, res) => {
   User.findOne({_id: userId, is_deleted: false}, (err, doc) => {
     if (err) return res.send({success: false, message: 'Server error.'});
     if (!doc) return res.send({success: false, message: 'User not found.'});
-    const { email, firstName, lastName, username, image } = doc;
-    const user = { email, firstName, lastName, username, image };
+    const { email, firstName, lastName, dni, birthdate, gender, userType, gold, rating, favorites, image } = doc;
+    const user = { email, firstName, lastName, dni, birthdate, gender, userType, gold, rating, favorites, image };
     res.send({success: user, user: user});
   });
 }
