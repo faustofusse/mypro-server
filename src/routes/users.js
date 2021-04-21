@@ -13,6 +13,7 @@ router.post('/verify', UserController.verifyUser);
 router.get('/verifyToken', UserController.verifyToken);
 router.get('/logout', auth, UserController.logout);
 router.get('/sessions', auth, UserController.fetchSessions);
+router.get('/email/check/:email', UserController.checkEmail);
 router.delete('/sessions', auth, UserController.deleteSessions);
 router.get('/:username', UserController.getUserByUsername);
 

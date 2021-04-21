@@ -6,31 +6,55 @@ const jwt = require("jsonwebtoken");
 const { sendRegisterEmail } = require("../utils/mail");
 require('dotenv').config();
 
+const getValuesFromObject = (object, values) => {
+  let newObject = {};
+  for (key in object) if (values.includes(key)) newObject[key] = object[key];
+  return newObject;
+}
+
+const userValues = ['email', 'name', 'phone', 'business', 'professional', 'password', 'google', 'enrollment', 'workZone', 'workArea', 'address', 'image'];
+const particularValues = userValues.concat(['lastName', 'gender', 'birthdate', 'dni', 'experience'])
+const businessValues = userValues.concat(['cuit', 'employees']);
+
 const validationConstraints = {
-  firstName: { presence: {allowEmpty: false}, type: "string" },
-  lastName: { presence: {allowEmpty: false}, type: "string" },
+  name: { presence: {allowEmpty: false}, type: "string" },
+  lastName: { presence: {allowEmpty: true}, type: "string" },
   email:{ presence: {allowEmpty: false}, type: "string", email: true },
-  password: { presence: {allowEmpty: false}, type: "string", length: { minimum: 8 } },
-  repeatPassword: { presence: {allowEmpty: false}, equality: "password" }
+  password: { presence: {allowEmpty: true}, type: "string", length: { minimum: 8 } },
+  repeatPassword: { presence: {allowEmpty: true}, equality: "password" }
 };
 
 exports.register = async (req, res) => {
-  let { email, password, firstName, lastName, dni, gender, birthdate, userType } = req.body;
+  let { email, password, business, dni, cuit, name, google } = req.body;
   email = email ? email.toLowerCase() : null;
+  // Find errors
   let errors = validate(req.body, validationConstraints);
   if (!errors) errors = {};
+  // Check email
   let users = await User.find({ email, is_deleted: false });
   if (users.length > 0) errors.email = [].concat(['Email is already registered.'], errors.email ? errors.email : []);
-  users = await User.find({ dni, is_deleted: false });
-  if (users.length > 0) errors.username = [].concat(['DNI is already registered.'], errors.dni ? errors.dni : []);
+  // Check dni or cuit
+  if (business != null && business == false && !errors.dni){
+    users = await User.find({ dni, is_deleted: false });
+    if (users.length > 0) errors.dni = ['DNI is already registered'];
+  } else if (business != null && business == true && !errors.cuit){
+    users = await User.find({ cuit, is_deleted: false });
+    if (users.length > 0) errors.cuit = ['This CUIT is already registered'];
+  }
+  // Send errors
   if (Object.keys(errors).length > 0) return res.send({success:false, message: 'Invalid fields', errors: errors});
-  const newUser = new User({ email, firstName, lastName, dni, gender, birthdate, userType });
-  newUser.password = newUser.generateHash(password);
-  if (process.env.EMAIL_VERIFICATION === 'true') {
-    const verificationToken = jwt.sign({ user: newUser._id, firstName, expires_at: Date.now() + 24 * 3600 * 1000 }, process.env.JWT_SECRET);
+  // Create user and encrypt password
+  const values = business ? businessValues : particularValues;
+  const newUser = new User(getValuesFromObject(req.body, values));
+  console.log('NEW USER', newUser);
+  if (password) newUser.password = newUser.generateHash(password);
+  // Send verification email
+  if (process.env.EMAIL_VERIFICATION === 'true' && google == null) {
+    const verificationToken = jwt.sign({ user: newUser._id, firstName: name, expires_at: Date.now() + 24 * 3600 * 1000 }, process.env.JWT_SECRET);
     await sendRegisterEmail(newUser, verificationToken);
     newUser.verificationToken = verificationToken;
   } else { newUser.verified_email = true; }
+  // Save user
   newUser.save((err, user) => {
     if (err) console.error(err);
     if (err) return res.send({success: false, message: 'Server error, user not created.'})
@@ -38,27 +62,42 @@ exports.register = async (req, res) => {
   });
 }
 
+exports.checkEmail = async (req, res) => {
+  const { email } = req.params;
+  const user = await User.findOne({ email: email, is_deleted: false });
+  const exists = user != null && user != undefined;
+  res.send({ success: true, message: `Email ${exists ? 'already exists.' : 'is free.'}`, exists: exists});
+}
+
+exports.googleLogin = async (req, res) => {
+  let { id } = req.body;
+  const user = await User.findOne({ google: id, is_deleted: false });
+  if (!user) return res.send({success: false, message: 'User not registered with google.'});
+  const userSession = new UserSession();
+  userSession.userId = user._id;
+  userSession.save((err, doc) => {
+      if (err) return res.send({success: false, message: 'Server error.'});
+      const token = jwt.sign({userId: user._id, sessionId: doc._id}, process.env.JWT_SECRET);
+      return res.send({success: user, message: 'Valid login.', token: token, user: user });
+  });
+}
+
 exports.login = async (req, res) => {
   let { email, password } = req.body;
   if (!email || !password) return res.send({success: false, message: 'Complete all the fields.'});
   email = email.toLowerCase();
-  User.find({ email, is_deleted: false }, (err, users) => {
-    if (err) return res.send({success: false, message: 'Error: database error.'});
-    if (users.length != 1) return res.send({success: false, message: 'Error: Invalid email.', errors: { email: ['Email not found.'] }});
-    let user = users[0];
-    if (user.is_deleted) return res.send({success: false, message: 'User deleted.'});
-    if (!user.verified_email) return res.send({success: false, message: 'User not verified.', errors: { email: ['Email not verified.']} });
-    const validPassword = bcrypt.compareSync(password, user.password);
-    if (!validPassword) return res.send({success: false, message: 'Error: Invalid password.', errors: { password: ['Invalid Password.'] }});
-    const userSession = new UserSession();
-    userSession.userId = user._id;
-    userSession.save((err, doc) => {
-        if (err) return res.send({success: false, message: 'Server error.'});
-        const token = jwt.sign({userId: user._id, sessionId: doc._id}, process.env.JWT_SECRET);
-        const { email, firstName, lastName, dni, birthdate, gender, userType, gold, rating, favorites, image } = user;
-        user = { email, firstName, lastName, dni, birthdate, gender, userType, gold, rating, favorites, image };
-        return res.send({success: user, message: 'Valid login.', token: token, user: user });
-    });
+  const user = await User.findOne({ email, is_deleted: false }).catch(err => res.send({success: false, message: 'Error: database error.'}));
+  if (!user) return res.send({success: false, message: 'Error: Invalid email.', errors: { email: ['Email not found.'] }});
+  if (user.is_deleted) return res.send({success: false, message: 'User deleted.'});
+  if (!user.verified_email) return res.send({success: false, message: 'User not verified.', errors: { email: ['Email not verified.']} });
+  const validPassword = bcrypt.compareSync(password, user.password);
+  if (!validPassword) return res.send({success: false, message: 'Error: Invalid password.', errors: { password: ['Invalid Password.'] }});
+  const userSession = new UserSession();
+  userSession.userId = user._id;
+  userSession.save((err, doc) => {
+      if (err) return res.send({success: false, message: 'Server error.'});
+      const token = jwt.sign({userId: user._id, sessionId: doc._id}, process.env.JWT_SECRET);
+      return res.send({success: user, message: 'Valid login.', token: token, user: user });
   });
 }
 
@@ -143,11 +182,9 @@ exports.verifyToken = async (req, res) => {
 
 exports.getUser = async (req, res) => {
   const { userId } = res.locals;
-  User.findOne({_id: userId, is_deleted: false}, (err, doc) => {
+  User.findOne({_id: userId, is_deleted: false}, (err, user) => {
     if (err) return res.send({success: false, message: 'Server error.'});
-    if (!doc) return res.send({success: false, message: 'User not found.'});
-    const { email, firstName, lastName, dni, birthdate, gender, userType, gold, rating, favorites, image } = doc;
-    const user = { email, firstName, lastName, dni, birthdate, gender, userType, gold, rating, favorites, image };
+    if (!user) return res.send({success: false, message: 'User not found.'});
     res.send({success: user, user: user});
   });
 }
@@ -157,9 +194,7 @@ exports.getUserByUsername = async (req, res) => {
   User.findOne({ username, is_deleted: false }, (err, user) => {
     if (err) return res.send({success: false, message: 'Server error.'});
     if (!user) return res.send({success: false, message: 'User not found.'});
-    const { email, firstName, lastName, username, image } = user;
-    const u = { email, firstName, lastName, username, image };
-    res.send({ success: true, message: 'User found.', user: u });
+    res.send({ success: true, message: 'User found.', user: user });
   });
 }
 
