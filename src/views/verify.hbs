@@ -1,0 +1,21 @@
+<h2>Hola {{name}}!</h2>
+<h3>Para verificar tu correo electronico ingresa tu contraseña:</h3>
+<input type="password" id="password" placeholder="Contraseña" />
+<input type="password" id="repeatPassword" placeholder="Repite la contraseña" />
+<button id="verify">Aceptar</button>
+
+<script>
+    const button = document.getElementById('verify');
+    const password = document.getElementById('password');
+    const repeatPassword = document.getElementById('repeatPassword');
+    button.onclick = async () => {
+        const payload = { token: window.location.pathname.replace('/verify/', ''), password: password.value, repeatPassword: repeatPassword.value }
+        const responseRaw = await fetch('/api/users/verify', { 
+            method: 'POST',
+            headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload) 
+        });
+        const response = await responseRaw.json();
+        alert(response.message);
+    }
+</script>
