@@ -6,15 +6,15 @@ const auth = require('../utils/auth');
 
 router.get('/', auth, UserController.getUser);
 router.delete('/', auth, UserController.deleteUser);
+router.put('/merge', UserController.merge);
 router.post('/register', UserController.register);
 router.post('/login', UserController.login);
 router.get('/verified/:id', UserController.isVerified);
 router.post('/verify', UserController.verifyUser);
 router.get('/verifyToken', UserController.verifyToken);
 router.get('/logout', auth, UserController.logout);
-router.get('/sessions', auth, UserController.fetchSessions);
 router.get('/email/check/:email', UserController.checkEmail);
+router.get('/sessions', auth, UserController.getSessions);
 router.delete('/sessions', auth, UserController.deleteSessions);
-router.get('/:username', UserController.getUserByUsername);
 
 module.exports = router;

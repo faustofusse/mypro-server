@@ -10,9 +10,11 @@ const UserSchema = new Schema({
     professional: { type: Boolean, required: true },
     password: { type: String, required: false },
     google: { type: String, default: null },
+    facebook: { type: String, default: null },
     // particular
     lastName: { type: String, required: false },
-    gender: { type: String, required: false, enum: ['male', 'female', 'other'] },
+    dni: { type: String, required: false },
+    // gender: { type: String, required: false, enum: ['male', 'female', 'other'] },
     birthdate: { type: Date, required: false },
     cuit: { type: String, required: false },
     // profesional
