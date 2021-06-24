@@ -26,15 +26,28 @@ module.exports.sendEmail = mailOptions => new Promise((resolve, reject) => {
 
 module.exports.sendRegisterEmail = (user, token) => {
   var mailOptions = {
-    from: 'Discover.me',
+    from: 'myPro',
     to:  user.email,
-    subject: 'Discover.me email verification.',
-    text:'Hi '+ user.firstName + '!' +
+    subject: 'myPro email verification.',
+    text:'Hi '+ user.name + '!' +
     '\nEnter this link to verify your discover.me user: '+
     '\n' + process.env.CLIENT_URL + '/verify/' + token +
     '\n' +
-    '\nName: ' + user.firstName + ' ' + user.lastName + 
-    '\nUsername: ' + user.username
+    '\nName: ' + user.name + ' ' + user.lastName
+  };
+  return this.sendEmail(mailOptions);
+};
+
+module.exports.sendEmailRecovery = (user, token) => {
+  var mailOptions = {
+    from: 'myPro',
+    to:  user.email,
+    subject: 'myPro password change.',
+    text:'Hi '+ user.name + '!' +
+    '\nEnter this link to change your myPro password: '+
+    '\n' + process.env.CLIENT_URL + '/password/change/' + token +
+    '\n' +
+    '\nName: ' + user.name + ' ' + user.lastName
   };
   return this.sendEmail(mailOptions);
 };

@@ -10,6 +10,12 @@ router.get('/verify/:token', (req, res) => {
   const { token } = req.params;
   const name = jwt.decode(token).firstName;
   res.render('verify', { name: name, title: 'Verify user' })
-})
+});
+
+router.get('/password/change/:token', (req, res) => {
+  const { token } = req.params;
+  const name = jwt.decode(token).firstName;
+  res.render('changePassword', { name: name, title: 'Change password' })
+});
 
 module.exports = router;

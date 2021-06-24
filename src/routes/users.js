@@ -11,6 +11,8 @@ router.post('/register', UserController.register);
 router.post('/login', UserController.login);
 router.get('/verified/:id', UserController.isVerified);
 router.post('/verify', UserController.verifyUser);
+router.post('/forgot', UserController.forgotPassword);
+router.post('/password/change', UserController.changePassword);
 router.get('/verifyToken', UserController.verifyToken);
 router.get('/logout', auth, UserController.logout);
 router.get('/email/check/:email', UserController.checkEmail);
